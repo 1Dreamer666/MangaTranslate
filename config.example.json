@@ -1,0 +1,38 @@
+{
+  "api": {
+    "base_url": "http://127.0.0.1:8045/v1",
+    "api_key": "sk-42c3360b3d73446ab1c87b7ce35f9b99",
+    "model": "gemini-3.8-flash-tiered",
+    "temperature": 0.2,
+    "timeout": 60,
+    "max_retries": 3
+  },
+  "detector": {
+    "model_path": "models/detector/comic-speech-bubble-detector.pt",
+    "conf": 0.25,
+    "device": "cuda"
+  },
+  "ocr": {
+    "model_path": "models/ocr/manga-ocr-base",
+    "device": "cuda"
+  },
+  "inpainter": {
+    "method": "telea",
+    "inpaint_radius": 5,
+    "dilate_kernel": 5,
+    "threshold": 210
+  },
+  "typesetter": {
+    "font_path": "C:/Windows/Fonts/msyh.ttc",
+    "fallback_font": "C:/Windows/Fonts/simhei.ttf",
+    "vertical": "auto",
+    "text_color": [0, 0, 0],
+    "stroke_color": [255, 255, 255],
+    "stroke_width": 2
+  },
+  "pipeline": {
+    "output_dir": "outputs",
+    "save_json": true,
+    "save_qa": true
+  }
+}
