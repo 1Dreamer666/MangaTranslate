@@ -4,7 +4,7 @@ Main pipeline coordinating detection, OCR, positional JSON translation, inpainti
 Supports whole-chapter narrative continuity and strict bounding box verification.
 """
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Tuple, Union
 import json
 import time
 import cv2
