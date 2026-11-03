@@ -16,7 +16,7 @@ MangaTranslate is a production-ready, modular pipeline designed to translate raw
 - **Manga-Specific Japanese OCR**: Uses `manga-ocr` with custom safetensors loading, running end-to-end on CUDA with sub-400ms latency per bubble.
 - **Context-Aware Translation**: Connects to OpenAI-compatible LLM endpoints (e.g. `gemini-3.8-flash-tiered`) with system prompts tailored for manga tone, honorifics, and sound effects, backed by local SHA256 disk caching to eliminate redundant API calls.
 - **Contour-Preserving Inpainting**: Employs connected-component analysis inside detected regions to ensure jagged bubble borders and sound effect outlines are never destroyed, cleanly erasing only text glyphs.
-- **Authentic CJK Typesetting**: Automatically calculates optimal font size, detects vertical vs. horizontal orientation based on bubble aspect ratio, flows vertical columns right-to-left, and adds subtle contrast strokes for readability.
+- **Authentic CJK Typesetting**: Automatically calculates optimal font size, detects vertical vs. horizontal orientation based on bubble aspect ratio, flows vertical columns right-to-left, and adds subtle contrast strokes for readability. A per-character symbol fallback renders `♡ ♥ ♦ ♣ ♠ ♪ ♬ ✕ ❤` with a dedicated symbol font instead of tofu boxes.
 - **Resumable Batch Processing**: Built-in resume capability skips already translated pages, exports structured JSON records (`<stem>.json`) for manual proofreading, and compiles visual contact sheets.
 
 ---
@@ -132,6 +132,8 @@ Parameters can be configured in `config.example.json` or overridden via CLI argu
 | `--no-json` | `pipeline.save_json` | `false` | Disable intermediate JSON metadata export |
 | `--contact-sheet` | - | `false` | Compile a contact sheet of all batch pages |
 
+`typesetter.font_path` selects the main CJK font used for Chinese text (Windows defaults to Microsoft YaHei). A per-character symbol fallback is applied automatically for `♡ ♥ ♦ ♣ ♠ ♪ ♬ ✕ ❤`: Segoe UI Symbol (`seguisym.ttf`) on Windows, or DejaVu Sans / Noto Sans Symbols 2 on Linux. As a result, `♡♥♦` no longer turn into `口` boxes, with no extra configuration required.
+
 ---
 
 ## Output Artifacts
@@ -152,6 +154,8 @@ For each translated page `<stem>.jpg`, the pipeline generates:
   `manga-ocr-base` uses `model.safetensors` to comply with PyTorch 2.5+ security standards. If you download weights manually, ensure `model.safetensors` is present in `models/ocr/manga-ocr-base/`.
 - **CJK Font Not Found**:
   By default, Windows system fonts (`C:\Windows\Fonts\msyh.ttc`) are used. On Linux or custom environments, specify `--font /path/to/font.ttf`.
+- **A symbol still shows as a box (`口`)**:
+  The built-in fallback covers `♡ ♥ ♦ ♣ ♠ ♪ ♬ ✕ ❤`. If another symbol is missing, add it to `SYMBOL_FALLBACK_CHARS` in `mangatranslate/typesetter.py` and make sure a symbol font is available (`seguisym.ttf` on Windows, `DejaVuSans.ttf` or `NotoSansSymbols2-Regular.ttf` on Linux).
 
 ---
 

@@ -20,6 +20,7 @@ MangaTranslate 是一套工业级、高画质的日漫自动汉化流水线工�
   - 根据气泡长宽比智能切换竖排（从右向左列流式）与横排布局；
   - 基于二分评估算法自适应寻找填满气泡的最佳字号；
   - 自动规避标点置顶（避头尾法则）；
+  - 内置逐字符符号回退字体，`♡ ♥ ♦ ♣ ♠ ♪ ♬ ✕ ❤` 等符号自动切换专用符号字体，避免显示为 `口` 豆腐块；
   - 支持自适应背景感知反色与抗混叠对比度文字描边（White Stroke）。
 - **断点续翻与批量生产**：内置 Resume 续翻机制，跳过已生成页面；自动导出结构化中间数据（`<stem>.json`）供人工校对修肉；支持并行生成左右对照 QA 质量走查图及全话缩略图展板（Contact Sheet）。
 
@@ -138,6 +139,8 @@ python scripts/translate.py `
 | `--no-json` | `pipeline.save_json` | `false` | 关闭中间 OCR 与翻译元数据 JSON 的导出 |
 | `--contact-sheet` | - | `false` | 批处理完成后自动拼合整话展板大图 |
 
+`typesetter.font_path` 指定正文中文所使用的 CJK 主字体（Windows 默认微软雅黑）。`♡ ♥ ♦ ♣ ♠ ♪ ♬ ✕ ❤` 等符号会自动启用逐字符回退：Windows 使用 Segoe UI Symbol（`seguisym.ttf`），Linux 使用 DejaVu Sans 或 Noto Sans Symbols 2，因此 `♡♥♦` 不会再显示为 `口` 方框，无需额外配置。
+
 ---
 
 ## 产出文件说明
@@ -159,6 +162,8 @@ python scripts/translate.py `
    本仓库在 `manga-ocr` 加载时全面采用 safetensors 格式权重，`scripts/download_models.ps1` 会自动执行兼容转换，确保在 PyTorch 2.5+ 环境下免报 CVE 拦截警告。
 3. **找不到中文字体或中文乱码**：
    Windows 环境下默认使用系统自带微软雅黑（`C:\Windows\Fonts\msyh.ttc`）。在 Linux 环境部署时，请安装 `fonts-noto-cjk` 或通过 `--font` 指定中文字体路径。
+4. **个别符号仍显示为方框（`口`）**：
+   内置回退仅覆盖 `♡ ♥ ♦ ♣ ♠ ♪ ♬ ✕ ❤`。如遇其他符号缺失，请在 `mangatranslate/typesetter.py` 的 `SYMBOL_FALLBACK_CHARS` 中补充，并确认系统存在可用的符号字体（Windows 的 `seguisym.ttf`，Linux 的 `DejaVuSans.ttf` 或 `NotoSansSymbols2-Regular.ttf`）。
 
 ---
 
