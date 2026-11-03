@@ -16,6 +16,11 @@ class MangaTypesetter:
     # Punctuation marks that should not start a line
     NO_START_PUNCT = set("，。！？、；：）》」』”’…—～~!?")
 
+    # Symbols commonly used in manga dialogue that Microsoft YaHei / SimHei
+    # do not cover. They are drawn with a symbol font instead of becoming
+    # tofu boxes (口) in the middle of a bubble.
+    SYMBOL_FALLBACK_CHARS = set("♡♥♦♣♠♪♬✕❤")
+
     def __init__(
         self,
         font_path: Optional[Union[str, Path]] = None,
@@ -25,9 +30,60 @@ class MangaTypesetter:
         stroke_width: int = 2,
     ):
         self.font_path = self._resolve_font(font_path, fallback_font)
+        self.symbol_font_path = self._resolve_symbol_font()
+        self._symbol_fonts: dict = {}
         self.default_color = default_color
         self.stroke_color = stroke_color
         self.stroke_width = stroke_width
+
+    @staticmethod
+    def _resolve_symbol_font() -> Optional[str]:
+        """Locate a font that covers common manga symbols (♡ ♥ ♦ ♪ ...)."""
+        candidates = [
+            Path(r"C:\Windows\Fonts\seguisym.ttf"),
+            Path(r"C:\Windows\Fonts\seguiemj.ttf"),
+            Path(r"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            Path(r"/usr/share/fonts/opentype/noto/NotoSansSymbols2-Regular.ttf"),
+        ]
+        for c in candidates:
+            if c.is_file():
+                return str(c)
+        return None
+
+    def _is_symbol_char(self, ch: str) -> bool:
+        """Whether a character must be rendered with the symbol fallback font."""
+        return bool(self.symbol_font_path) and ch in self.SYMBOL_FALLBACK_CHARS
+
+    def _symbol_font(self, size: int) -> ImageFont.FreeTypeFont:
+        """Load (and cache) the symbol font at a given pixel size."""
+        if size not in self._symbol_fonts:
+            self._symbol_fonts[size] = ImageFont.truetype(self.symbol_font_path, size)
+        return self._symbol_fonts[size]
+
+    def _font_runs(self, text: str) -> List[Tuple[str, bool]]:
+        """Split text into runs of (characters, uses_symbol_font)."""
+        runs: List[Tuple[str, bool]] = []
+        buf: List[str] = []
+        current_is_symbol: Optional[bool] = None
+        for ch in text:
+            is_symbol = self._is_symbol_char(ch)
+            if buf and is_symbol != current_is_symbol:
+                runs.append(("".join(buf), bool(current_is_symbol)))
+                buf = []
+            buf.append(ch)
+            current_is_symbol = is_symbol
+        if buf:
+            runs.append(("".join(buf), bool(current_is_symbol)))
+        return runs
+
+    def _measure_text(self, text: str, font: ImageFont.FreeTypeFont, size: int) -> int:
+        """Measure text width across mixed CJK and symbol-font runs."""
+        total = 0
+        for run, is_symbol in self._font_runs(text):
+            run_font = self._symbol_font(size) if is_symbol else font
+            bbox = run_font.getbbox(run)
+            total += bbox[2] - bbox[0]
+        return total
 
     @staticmethod
     def _resolve_font(primary: Optional[Union[str, Path]], fallback: Optional[Union[str, Path]]) -> str:
@@ -142,10 +198,11 @@ class MangaTypesetter:
                 col_offset_y = (total_block_h - len(col_chars) * line_h) // 2
                 for row_idx, char in enumerate(col_chars):
                     cy = start_y + col_offset_y + row_idx * line_h
+                    char_font = self._symbol_font(best_size) if self._is_symbol_char(char) else font
                     draw.text(
                         (cx, cy),
                         char,
-                        font=font,
+                        font=char_font,
                         fill=fill_color,
                         stroke_width=self.stroke_width,
                         stroke_fill=stroke_col,
@@ -158,19 +215,25 @@ class MangaTypesetter:
             start_y = y1 + pad_y + (target_h - total_block_h) // 2
 
             for row_idx, line_text in enumerate(lines):
-                # Measure line width for centering
-                bbox = font.getbbox(line_text)
-                lw = bbox[2] - bbox[0]
+                # Measure line width (mixed CJK/symbol) for centering
+                lw = self._measure_text(line_text, font, best_size)
                 lx = x1 + pad_x + (target_w - lw) // 2
                 ly = start_y + row_idx * line_h
-                draw.text(
-                    (lx, ly),
-                    line_text,
-                    font=font,
-                    fill=fill_color,
-                    stroke_width=self.stroke_width,
-                    stroke_fill=stroke_col,
-                )
+                cx = lx
+                # Draw contiguous runs separately so each uses the right font,
+                # while keeping stroke merging intact within a run.
+                for run, is_symbol in self._font_runs(line_text):
+                    run_font = self._symbol_font(best_size) if is_symbol else font
+                    draw.text(
+                        (cx, ly),
+                        run,
+                        font=run_font,
+                        fill=fill_color,
+                        stroke_width=self.stroke_width,
+                        stroke_fill=stroke_col,
+                    )
+                    bbox = run_font.getbbox(run)
+                    cx += bbox[2] - bbox[0]
 
         return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
@@ -201,7 +264,7 @@ class MangaTypesetter:
                 layout = self._wrap_horizontal(text, font, target_w)
                 line_h = int(size * 1.2)
                 total_h = len(layout) * line_h
-                max_w = max(font.getbbox(l)[2] - font.getbbox(l)[0] for l in layout)
+                max_w = max(self._measure_text(l, font, size) for l in layout)
                 if total_h <= target_h and max_w <= target_w:
                     return size, layout
 
@@ -238,8 +301,7 @@ class MangaTypesetter:
 
         for char in text:
             test_line = current_line + char
-            bbox = font.getbbox(test_line)
-            line_w = bbox[2] - bbox[0]
+            line_w = self._measure_text(test_line, font, font.size)
             if line_w > max_w and current_line:
                 lines.append(current_line)
                 current_line = char
